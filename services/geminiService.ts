@@ -20,7 +20,7 @@ export const extractStatementData = async (files: SourceFile[]): Promise<Extract
     {
       "totalAmount": 0.0,
       "transactions": [
-        { "id": "id_curto", "date": "YYYY-MM-DD", "description": "NOME DO ESTABELECIMENTO", "amount": 0.0 }
+        { "id": "id_curto", "date": "DD/MM/YYYY", "description": "NOME DO ESTABELECIMENTO", "amount": 0.0 }
       ]
     }
     
@@ -68,6 +68,8 @@ export const extractAllocationData = async (files: SourceFile[]): Promise<Alloca
     - Não use crase, markdown (\`\`\`json) ou comentários.
     - Analise os arquivos de ALOCAÇÃO CONTÁBIL anexados.
     - Capture: Data, Descrição/Histórico, Valor (R$) e Centro de Custo (se disponível).
+    - Converta valores para números decimais (ex: 1250.50).
+    - IMPORTANTE: Todos os valores devem ser SEMPRE POSITIVOS (remova o sinal de menos se houver).
     - Ignore cabeçalhos e totais, foque nas linhas de lançamento.
     - Gere um ID único curto para cada alocação.
     
@@ -77,7 +79,7 @@ export const extractAllocationData = async (files: SourceFile[]): Promise<Alloca
     {
       "totalAmount": 0.0,
       "allocations": [
-        { "id": "id_curto", "date": "YYYY-MM-DD", "description": "HISTÓRICO", "amount": 0.0, "costCenter": "OPCIONAL" }
+        { "id": "id_curto", "date": "DD/MM/YYYY", "description": "HISTÓRICO", "amount": 0.0, "costCenter": "OPCIONAL" }
       ]
     }
     

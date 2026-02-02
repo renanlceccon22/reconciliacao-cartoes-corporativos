@@ -109,6 +109,14 @@ export const dbService = {
 
     // Invoices & Transactions
     async saveInvoice(cardName: string, competencia: string, totalAmount: number, transactions: Transaction[]) {
+        const normalizeDate = (d: string) => {
+            if (d && d.includes('/')) {
+                const [day, month, year] = d.split('/');
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            return d;
+        };
+
         // 1. Create Invoice Header
         const { data: invoice, error: invError } = await supabase
             .from('invoices')
@@ -121,7 +129,7 @@ export const dbService = {
         // 2. Create Transactions
         const txsToInsert = transactions.map(t => ({
             invoice_id: invoice.id,
-            date: t.date,
+            date: normalizeDate(t.date),
             description: t.description,
             amount: t.amount
         }));
@@ -148,9 +156,11 @@ export const dbService = {
         // 2. Create Allocations
         const allocsToInsert = allocations.map(a => ({
             report_id: report.id,
-            date: a.date,
+            date: a.date && a.date.includes('/') ?
+                `${a.date.split('/')[2]}-${a.date.split('/')[1].padStart(2, '0')}-${a.date.split('/')[0].padStart(2, '0')}` :
+                a.date,
             description: a.description,
-            amount: a.amount,
+            amount: Math.abs(a.amount),
             cost_center: a.costCenter
         }));
 
