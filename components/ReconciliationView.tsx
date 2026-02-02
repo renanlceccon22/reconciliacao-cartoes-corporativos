@@ -1,5 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Transaction, Allocation, ReconciledPair, AccountingParameter, AccountingEntry } from '../types';
 
 interface ReconciliationViewProps {
@@ -210,6 +212,94 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     const futureComp = getNextCompetencia(competencia);
     const compFormatted = formatCompText(futureComp);
     exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted} FUTURO`, false);
+  };
+
+  const exportToPDF = (items: any[], title: string, filenameSuffix: string, showBatchColumn: boolean = false) => {
+    const doc = new jsPDF();
+    const compText = formatCompText(competencia);
+
+    // Design Profissional - Cabeçalho
+    doc.setFontSize(22);
+    doc.setTextColor(0, 59, 113); // Navy Blue (#003B71)
+    doc.text("Relatório Contábil", 14, 25);
+
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`EMITIDO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 32);
+
+    doc.setDrawColor(0, 59, 113);
+    doc.setLineWidth(0.5);
+    doc.line(14, 35, 196, 35);
+
+    // Informações do Relatório
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title.toUpperCase(), 14, 45);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Cartão Corporativo: ${cardName}`, 14, 52);
+    doc.text(`Competência: ${compText}`, 14, 58);
+
+    const tableHeaders = [["DATA", "DESCRIÇÃO / HISTÓRICO", "VALOR"]];
+    if (showBatchColumn) {
+      tableHeaders[0].push("LOTE CONTÁBIL");
+    }
+
+    const tableData = items.map(item => {
+      const row = [
+        item.date,
+        item.description,
+        item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      ];
+      if (showBatchColumn) {
+        row.push("________________"); // Espaço para preenchimento
+      }
+      return row;
+    });
+
+    autoTable(doc, {
+      startY: 65,
+      head: tableHeaders,
+      body: tableData,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [0, 59, 113],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold',
+        halign: 'center'
+      },
+      columnStyles: {
+        0: { cellWidth: 25, halign: 'center' },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 35, halign: 'right' },
+        3: { cellWidth: 35, halign: 'center' }
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [245, 247, 249]
+      },
+      margin: { top: 50, left: 14, right: 14 },
+      didDrawPage: (data) => {
+        const pageCount = (doc as any).internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Página ${data.pageNumber} de ${pageCount} - Gerado por Antigravity Finance`,
+          doc.internal.pageSize.width / 2,
+          doc.internal.pageSize.height - 10,
+          { align: 'center' }
+        );
+      }
+    });
+
+    const compFormatted = formatCompText(competencia);
+    doc.save(`${cardName.replace(/\s/g, '_')} - ${filenameSuffix} - ${compFormatted}.pdf`);
   };
 
   const handleToggleIgnore = (id: string) => {
@@ -451,6 +541,17 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                   CSV Atual
                 </button>
               )}
+              {reconciliation.unmatchedTransactions.length > 0 && (
+                <button
+                  onClick={() => exportToPDF(reconciliation.unmatchedTransactions, "Pendentes Fatura", "PENDENTES_FATURA")}
+                  className="text-[10px] bg-gray-700 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors flex items-center shadow-md active:scale-95"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  PDF
+                </button>
+              )}
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[400px] overflow-y-auto">
@@ -525,6 +626,12 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                     </svg>
                     CSV Futuro
+                  </button>
+                  <button
+                    onClick={() => exportToPDF(reconciliation.unmatchedAllocations, "Pendentes Alocação", "PENDENTES_ALOCACAO", true)}
+                    className="text-[9px] bg-red-800 text-white font-bold px-2 py-1 rounded-lg hover:bg-red-900 transition-colors flex items-center shadow-md active:scale-95 whitespace-nowrap"
+                  >
+                    PDF Relatório
                   </button>
                 </div>
               </div>
@@ -602,6 +709,12 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                   title="CSV Nota Lançada / Abater"
                 >
                   CSV Abater
+                </button>
+                <button
+                  onClick={() => exportToPDF(reconciliation.outOfCompAllocations, "Fora de Competência", "FORA_COMPETENCIA", true)}
+                  className="text-[9px] bg-purple-800 text-white font-bold px-2 py-1.5 rounded-lg hover:bg-purple-900 transition-colors shadow-sm whitespace-nowrap"
+                >
+                  PDF
                 </button>
               </div>
               {selectedOutCompIds.size > 0 && (
