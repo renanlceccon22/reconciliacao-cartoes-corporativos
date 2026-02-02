@@ -59,6 +59,10 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // History / Existing Data States
+  const [existingInvoiceData, setExistingInvoiceData] = useState<any>(null);
+  const [existingAllocationData, setExistingAllocationData] = useState<any>(null);
+
   // Load data from Supabase on mount
   useEffect(() => {
     // Check current session
@@ -120,6 +124,50 @@ const App: React.FC = () => {
     else localStorage.removeItem('reconciliacao_allocation_result');
   }, [allocationResult]);
 
+  // Check for existing data in DB when selection changes
+  useEffect(() => {
+    const checkExistingData = async () => {
+      setExistingInvoiceData(null);
+      setExistingAllocationData(null);
+      if (!selectedUploadCard || !selectedPeriod) return;
+
+      try {
+        const [inv, alloc] = await Promise.all([
+          dbService.getInvoice(selectedUploadCard, selectedPeriod),
+          dbService.getAllocationReport(selectedUploadCard, selectedPeriod)
+        ]);
+
+        if (inv) setExistingInvoiceData(inv);
+        if (alloc) setExistingAllocationData(alloc);
+      } catch (err) {
+        console.error("Erro ao verificar histórico:", err);
+      }
+    };
+    checkExistingData();
+  }, [selectedUploadCard, selectedPeriod]);
+
+  const loadInvoiceFromDB = () => {
+    if (!existingInvoiceData) return;
+    setInvoiceResult({
+      cartaoVenculado: existingInvoiceData.card_name,
+      competencia: existingInvoiceData.competencia,
+      totalAmount: existingInvoiceData.total_amount,
+      transactions: existingInvoiceData.transactions
+    });
+    setErrorMessage(null);
+  };
+
+  const loadAllocationFromDB = () => {
+    if (!existingAllocationData) return;
+    setAllocationResult({
+      cartaoVenculado: existingAllocationData.card_name,
+      competencia: existingAllocationData.competencia,
+      totalAmount: existingAllocationData.total_amount,
+      allocations: existingAllocationData.allocations
+    });
+    setErrorMessage(null);
+  };
+
   const fileToSourceFile = (file: File): Promise<SourceFile> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -152,9 +200,23 @@ const App: React.FC = () => {
       };
       setInvoiceResult(fullResult);
 
+      // Upload to Storage
+      let fileUrl = undefined;
+      try {
+        if (files.length > 0) {
+          const path = `${selectedUploadCard}/${selectedPeriod}/${Date.now()}_${files[0].name}`;
+          fileUrl = await dbService.uploadFile(files[0], 'faturas', path);
+        }
+      } catch (upErr) {
+        console.error("Erro no upload do arquivo:", upErr);
+      }
+
       // Save to Supabase
       try {
-        await dbService.saveInvoice(selectedUploadCard, selectedPeriod, fullResult.totalAmount, fullResult.transactions);
+        await dbService.saveInvoice(selectedUploadCard, selectedPeriod, fullResult.totalAmount, fullResult.transactions, fileUrl);
+        // Refresh existing data check
+        const inv = await dbService.getInvoice(selectedUploadCard, selectedPeriod);
+        if (inv) setExistingInvoiceData(inv);
       } catch (saveErr) {
         console.error("Erro ao salvar fatura no banco de dados:", saveErr);
       }
@@ -185,9 +247,23 @@ const App: React.FC = () => {
       };
       setAllocationResult(fullAllocResult);
 
+      // Upload to Storage
+      let fileUrl = undefined;
+      try {
+        if (files.length > 0) {
+          const path = `${selectedUploadCard}/${selectedPeriod}/${Date.now()}_${files[0].name}`;
+          fileUrl = await dbService.uploadFile(files[0], 'alocacoes', path);
+        }
+      } catch (upErr) {
+        console.error("Erro no upload do arquivo:", upErr);
+      }
+
       // Save to Supabase
       try {
-        await dbService.saveAllocationReport(selectedUploadCard, selectedPeriod, fullAllocResult.totalAmount, fullAllocResult.allocations);
+        await dbService.saveAllocationReport(selectedUploadCard, selectedPeriod, fullAllocResult.totalAmount, fullAllocResult.allocations, fileUrl);
+        // Refresh existing data check
+        const alloc = await dbService.getAllocationReport(selectedUploadCard, selectedPeriod);
+        if (alloc) setExistingAllocationData(alloc);
       } catch (saveErr) {
         console.error("Erro ao salvar alocação no banco de dados:", saveErr);
       }
@@ -452,6 +528,32 @@ const App: React.FC = () => {
                   title="Anexar Faturas (PDF/Imagem)"
                   subtitle={selectedUploadCard ? `Importando para: ${selectedUploadCard} (${formatCompetencia(selectedPeriod)})` : "Selecione o cartão acima primeiro"}
                 />
+
+                {existingInvoiceData && !invoiceResult && (
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg flex justify-between items-center animate-fadeIn">
+                    <div>
+                      <p className="font-bold text-[#003B71] flex items-center">
+                        <span className="text-xl mr-2">📂</span>
+                        Fatura encontrada no histórico
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Importada em: {new Date(existingInvoiceData.created_at).toLocaleString('pt-BR')}
+                      </p>
+                      {existingInvoiceData.file_path && (
+                        <a href={existingInvoiceData.file_path} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline mt-1 block">
+                          Ver PDF original
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      onClick={loadInvoiceFromDB}
+                      className="bg-[#003B71] text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-800 shadow-md transition-all active:scale-95"
+                    >
+                      CARREGAR DADOS SALVOS
+                    </button>
+                  </div>
+                )}
+
                 {invoiceResult && (
                   <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-green-800 text-sm font-medium text-center">
                     ✓ Fatura já carregada no sistema ({invoiceResult.transactions.length} transações).
@@ -468,6 +570,32 @@ const App: React.FC = () => {
                   title="Anexar Alocações (PDF/Imagem)"
                   subtitle={selectedUploadCard ? `Importando para: ${selectedUploadCard} (${formatCompetencia(selectedPeriod)})` : "Selecione o cartão acima primeiro"}
                 />
+
+                {existingAllocationData && !allocationResult && (
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg flex justify-between items-center animate-fadeIn">
+                    <div>
+                      <p className="font-bold text-[#003B71] flex items-center">
+                        <span className="text-xl mr-2">📂</span>
+                        Alocação encontrada no histórico
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Importada em: {new Date(existingAllocationData.created_at).toLocaleString('pt-BR')}
+                      </p>
+                      {existingAllocationData.file_path && (
+                        <a href={existingAllocationData.file_path} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 underline mt-1 block">
+                          Ver PDF original
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      onClick={loadAllocationFromDB}
+                      className="bg-[#003B71] text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-blue-800 shadow-md transition-all active:scale-95"
+                    >
+                      CARREGAR DADOS SALVOS
+                    </button>
+                  </div>
+                )}
+
                 {allocationResult && (
                   <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-yellow-800 text-sm font-medium text-center">
                     ✓ Alocação já carregada no sistema ({allocationResult.allocations.length} itens).
