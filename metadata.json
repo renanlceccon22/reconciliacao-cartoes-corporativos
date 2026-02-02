@@ -1,0 +1,5 @@
+{
+  "name": "reconciliacao-cartoes-corporativos",
+  "description": "Uma ferramenta minimalista para extrair transações de faturas de cartão corporativo usando IA, projetada especificamente para o fluxo de trabalho da Educação Adventista.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+    html {
+        font-size: 70%;
+    }
+
+    :root {
+        color-scheme: light !important;
+    }
+
+    body {
+        background-color: #f8fafc;
+        color: #0f172a;
+        font-family: var(--font-sans);
+    }
+
+    /* Força fundo branco e texto escuro em campos de formulário independentemente das configurações do sistema */
+    input,
+    select,
+    textarea {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+
+    input::placeholder {
+        color: #94a3b8 !important;
+    }
+}
