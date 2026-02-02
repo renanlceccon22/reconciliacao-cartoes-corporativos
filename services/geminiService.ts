@@ -24,7 +24,7 @@ export const extractStatementData = async (files: SourceFile[]): Promise<Extract
         'apikey': anonKey,
         'Authorization': `Bearer ${session?.access_token || anonKey}`
       },
-      body: JSON.stringify({ prompt, files })
+      body: JSON.stringify({ prompt, files, apiKey: import.meta.env.VITE_GEMINI_API_KEY })
     });
 
     if (!response.ok) {
@@ -65,7 +65,7 @@ export const extractAllocationData = async (files: SourceFile[]): Promise<Alloca
         'apikey': anonKey,
         'Authorization': `Bearer ${session?.access_token || anonKey}`
       },
-      body: JSON.stringify({ prompt, files })
+      body: JSON.stringify({ prompt, files, apiKey: import.meta.env.VITE_GEMINI_API_KEY })
     });
 
     if (!response.ok) {
