@@ -330,7 +330,7 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       <Header />
 
-      <main className="flex-grow container mx-auto px-4 py-4 max-w-4xl">
+      <main className="flex-grow container mx-auto px-4 py-4 max-w-[98%]">
         <div className="flex border-b border-gray-200 mb-6 space-x-2 md:space-x-6 justify-center overflow-x-auto">
           <button
             onClick={() => setActiveTab('cadastro')}
@@ -413,7 +413,7 @@ const App: React.FC = () => {
         )}
 
         {(activeTab === 'faturas' || activeTab === 'alocacoes') && (
-          <div className="animate-fadeIn max-w-2xl mx-auto">
+          <div className="animate-fadeIn max-w-4xl mx-auto">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -532,6 +532,7 @@ const App: React.FC = () => {
               allocations={allocationResult?.allocations || []}
               parameters={parameters}
               cardName={invoiceResult?.cartaoVenculado || allocationResult?.cartaoVenculado || ''}
+              competencia={invoiceResult?.competencia || allocationResult?.competencia || ''}
             />
           </div>
         )}

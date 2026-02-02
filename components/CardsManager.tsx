@@ -38,7 +38,7 @@ const CardsManager: React.FC<CardsManagerProps> = ({ cards, onAddCard, onRemoveC
   };
 
   return (
-    <div className="max-w-3xl mx-auto animate-fadeIn space-y-8">
+    <div className="max-w-5xl mx-auto animate-fadeIn space-y-8">
       {/* Importação em Massa */}
       <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div className="flex justify-between items-start mb-4">

@@ -7,9 +7,27 @@ interface ReconciliationViewProps {
   allocations: Allocation[];
   parameters: AccountingParameter[];
   cardName: string;
+  competencia: string;
 }
 
-const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, allocations, parameters, cardName }) => {
+const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, allocations, parameters, cardName, competencia }) => {
+  const formatCompText = (comp: string) => {
+    if (!comp) return '';
+    const [year, month] = comp.split('-');
+    const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    return `${months[parseInt(month) - 1]}_${year}`;
+  };
+
+  const getNextCompetencia = (comp: string) => {
+    if (!comp) return '';
+    let [year, month] = comp.split('-').map(Number);
+    month++;
+    if (month > 12) {
+      month = 1;
+      year++;
+    }
+    return `${year}-${month.toString().padStart(2, '0')}`;
+  };
   const reconciliation = useMemo(() => {
     const reconciled: ReconciledPair[] = [];
     const unmatchedTransactions: Transaction[] = [...transactions];
@@ -18,7 +36,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     // Lógica de Match Simples: Mesmo valor
     for (let i = unmatchedTransactions.length - 1; i >= 0; i--) {
       const tx = unmatchedTransactions[i];
-      const matchIdx = unmatchedAllocations.findIndex(al => 
+      const matchIdx = unmatchedAllocations.findIndex(al =>
         Math.abs(al.amount - tx.amount) < 0.01
       );
 
@@ -39,48 +57,38 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
 
   const exportToCSV = (entries: AccountingEntry[], filename: string, isFromFatura: boolean) => {
     if (entries.length === 0) return;
-    
+
     // Conforme solicitado: Célula A1 com valor fixo 1322
     const a1Line = "1322\n";
-    
-    // Novo Cabeçalho: Conta;Subconta;Fundo;Departamento;Restricao;Valor;Referencia;Historico
-    const headers = "Conta;Subconta;Fundo;Departamento;Restricao;Valor;Referencia;Historico\n";
-    
+
     // Montagem das linhas (2 linhas por lançamento: Débito e Crédito)
     const rows = entries.flatMap(e => {
       const valorInteiro = Math.round(e.valor * 100);
       const valorPositivo = valorInteiro.toString();
       const valorNegativo = `-${valorInteiro}`;
-      
-      // Lógica de Histórico diferenciada
-      // Fatura: Cartão Corporativo - (data) - (Historico fatura)
-      // Alocação: Mantém o histórico original da alocação
-      const historicoFinal = isFromFatura 
+
+      const historicoFinal = isFromFatura
         ? `Cartão Corporativo - ${e.data} - ${e.historico}`
         : e.historico;
-      
+
       const cleanHistorico = historicoFinal.replace(/"/g, '""');
 
-      // Linha 1: Débito
-      // Ordem: Conta;Subconta;Fundo;Departamento;Restricao;Valor;Referencia;Historico
       const lineDebit = `${e.contaDebito};${e.subcontaDebito};${e.fundo};${e.departamentoDebito};${e.restricaoDebito};${valorPositivo};N;"${cleanHistorico}"`;
-      
-      // Linha 2: Crédito
       const lineCredit = `${e.contaCredito};${e.subcontaCredito};${e.fundo};${e.departamentoCredito};${e.restricaoCredito};${valorNegativo};N;"${cleanHistorico}"`;
-      
+
       return [lineDebit, lineCredit];
     }).join("\n");
-    
+
     // Blob com BOM para UTF-8 para garantir acentuação no Excel
-    const blob = new Blob(["\uFEFF" + a1Line + headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\uFEFF" + a1Line + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    
+
     link.setAttribute("href", url);
     link.setAttribute("download", `${filename}.csv`);
     document.body.appendChild(link);
     link.click();
-    
+
     // Limpeza
     setTimeout(() => {
       document.body.removeChild(link);
@@ -90,8 +98,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
 
   const handleExportUnmatchedTransactions = () => {
     const entries: AccountingEntry[] = reconciliation.unmatchedTransactions.map(tx => {
-      const param = parameters.find(p => 
-        p.cartao.trim().toLowerCase() === cardName.trim().toLowerCase() && 
+      const param = parameters.find(p =>
+        p.cartao.trim().toLowerCase() === cardName.trim().toLowerCase() &&
         p.motivo.toLowerCase().includes("pendente")
       );
 
@@ -116,13 +124,14 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return;
     }
 
-    exportToCSV(entries, `importar_fatura_pendentes_${cardName.replace(/\s/g, '_')}`, true);
+    const compFormatted = formatCompText(competencia);
+    exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, true);
   };
 
   const handleExportUnmatchedAllocations = () => {
     const entries: AccountingEntry[] = reconciliation.unmatchedAllocations.map(al => {
-      const param = parameters.find(p => 
-        p.cartao.trim().toLowerCase() === cardName.trim().toLowerCase() && 
+      const param = parameters.find(p =>
+        p.cartao.trim().toLowerCase() === cardName.trim().toLowerCase() &&
         (p.motivo.toLowerCase().includes("presta") || p.motivo.toLowerCase().includes("aloca"))
       );
 
@@ -147,7 +156,41 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return;
     }
 
-    exportToCSV(entries, `importar_prestacao_contas_${cardName.replace(/\s/g, '_')}`, false);
+    const compFormatted = formatCompText(competencia);
+    exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, false);
+  };
+
+  const handleExportDevolverAllocations = () => {
+    const entries: AccountingEntry[] = reconciliation.unmatchedAllocations.map(al => {
+      const param = parameters.find(p =>
+        p.cartao.trim().toLowerCase() === cardName.trim().toLowerCase() &&
+        p.motivo.toLowerCase().includes("devolver")
+      );
+
+      return {
+        data: al.date,
+        historico: al.description,
+        valor: al.amount,
+        contaDebito: param?.contaDebito || '',
+        contaCredito: param?.contaCredito || '',
+        subcontaDebito: param?.subcontaDebito || '',
+        subcontaCredito: param?.subcontaCredito || '',
+        fundo: param?.fundo || '',
+        departamentoDebito: param?.departamentoDebito || '',
+        departamentoCredito: param?.departamentoCredito || '',
+        restricaoDebito: param?.restricaoDebito || '',
+        restricaoCredito: param?.restricaoCredito || '',
+      };
+    }).filter(e => e.contaDebito !== '');
+
+    if (entries.length === 0) {
+      alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Devolver".`);
+      return;
+    }
+
+    const futureComp = getNextCompetencia(competencia);
+    const compFormatted = formatCompText(futureComp);
+    exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted} FUTURO`, false);
   };
 
   return (
@@ -213,14 +256,14 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
               Pendentes Fatura
             </h4>
             {reconciliation.unmatchedTransactions.length > 0 && (
-              <button 
+              <button
                 onClick={handleExportUnmatchedTransactions}
                 className="text-[10px] bg-orange-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-orange-700 transition-colors flex items-center shadow-md active:scale-95"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Baixar CSV Importação
+                CSV Atual
               </button>
             )}
           </div>
@@ -248,15 +291,28 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
               Pendentes Alocação
             </h4>
             {reconciliation.unmatchedAllocations.length > 0 && (
-              <button 
-                onClick={handleExportUnmatchedAllocations}
-                className="text-[10px] bg-red-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-red-700 transition-colors flex items-center shadow-md active:scale-95"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Baixar CSV Importação
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleExportUnmatchedAllocations}
+                  className="text-[9px] bg-red-600 text-white font-bold px-2 py-1 rounded-lg hover:bg-red-700 transition-colors flex items-center shadow-md active:scale-95 whitespace-nowrap"
+                  title="Exportar Prestação de Contas (Competência Atual)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  CSV Atual
+                </button>
+                <button
+                  onClick={handleExportDevolverAllocations}
+                  className="text-[9px] bg-indigo-600 text-white font-bold px-2 py-1 rounded-lg hover:bg-indigo-700 transition-colors flex items-center shadow-md active:scale-95 whitespace-nowrap"
+                  title="Exportar Devolução para Cartões (Próxima Competência)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  CSV Futuro
+                </button>
+              </div>
             )}
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[400px] overflow-y-auto">
