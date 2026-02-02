@@ -20,6 +20,13 @@ export const dbService = {
         if (error) throw error;
     },
 
+    async addCards(cards: Card[]) {
+        const { error } = await supabase
+            .from('cards')
+            .insert(cards);
+        if (error) throw error;
+    },
+
     async removeCard(name: string) {
         const { error } = await supabase
             .from('cards')
@@ -69,6 +76,26 @@ export const dbService = {
                 restricao_debito: p.restricaoDebito,
                 restricao_credito: p.restricaoCredito
             }]);
+        if (error) throw error;
+    },
+
+    async addParameters(params: AccountingParameter[]) {
+        const mapped = params.map(p => ({
+            card_name: p.cartao,
+            motivo: p.motivo,
+            conta_debito: p.contaDebito,
+            conta_credito: p.contaCredito,
+            subconta_debito: p.subcontaDebito,
+            subconta_credito: p.subcontaCredito,
+            fundo: p.fundo,
+            departamento_debito: p.departamentoDebito,
+            departamento_credito: p.departamentoCredito,
+            restricao_debito: p.restricaoDebito,
+            restricao_credito: p.restricaoCredito
+        }));
+        const { error } = await supabase
+            .from('accounting_parameters')
+            .insert(mapped);
         if (error) throw error;
     },
 

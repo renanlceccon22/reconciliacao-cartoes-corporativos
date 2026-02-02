@@ -208,7 +208,7 @@ const App: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
         const lines = text.split(/\r?\n/);
@@ -227,6 +227,7 @@ const App: React.FC = () => {
           }
         }
         if (newCards.length > 0) {
+          await dbService.addCards(newCards);
           setCards(prev => [...prev, ...newCards]);
           setStatus(AppStatus.SUCCESS);
         }
@@ -245,7 +246,7 @@ const App: React.FC = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
         const lines = text.split(/\r?\n/);
@@ -276,6 +277,7 @@ const App: React.FC = () => {
           }
         }
         if (newParams.length > 0) {
+          await dbService.addParameters(newParams);
           setParameters(prev => [...prev, ...newParams]);
           setStatus(AppStatus.SUCCESS);
         }
@@ -391,9 +393,7 @@ const App: React.FC = () => {
             }}
             onBulkAdd={async (params) => {
               try {
-                for (const p of params) {
-                  await dbService.addParameter(p);
-                }
+                await dbService.addParameters(params);
                 setParameters(prev => [...prev, ...params]);
               } catch (err) {
                 setErrorMessage("Erro ao salvar parâmetros no banco de dados.");
