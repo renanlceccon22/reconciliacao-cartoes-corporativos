@@ -63,8 +63,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return month === compMonth && year === compYear;
     };
 
-    const outOfCompAllocations = unmatchedAllocations.filter(al => !isSameMonth(al.date, competencia));
-    const finalUnmatchedAllocations = unmatchedAllocations.filter(al => isSameMonth(al.date, competencia));
+    const outOfCompAllocations = unmatchedAllocations.filter(al => !isSameMonth(al.postingDate || al.date, competencia));
+    const finalUnmatchedAllocations = unmatchedAllocations.filter(al => isSameMonth(al.postingDate || al.date, competencia));
 
     return {
       reconciled,
@@ -287,17 +287,31 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     setSelectedOutCompIds(new Set());
   };
 
-  const handleExportGrouped = (isTx: boolean) => {
-    const selectedIds = isTx ? selectedTxIds : selectedAllocIds;
-    const items = isTx
-      ? transactions.filter(t => selectedIds.has(t.id))
-      : allocations.filter(a => selectedIds.has(a.id));
+  const handleExportGrouped = (source: 'fatura' | 'alocacao' | 'fora') => {
+    let selectedIds: Set<string>;
+    let items: any[];
+    let isFromFatura = false;
+    let motivoMatch = "presta";
+
+    if (source === 'fatura') {
+      selectedIds = selectedTxIds;
+      items = transactions.filter(t => selectedIds.has(t.id));
+      isFromFatura = true;
+      motivoMatch = "pendente";
+    } else if (source === 'alocacao') {
+      selectedIds = selectedAllocIds;
+      items = allocations.filter(a => selectedIds.has(a.id));
+      motivoMatch = "presta";
+    } else {
+      selectedIds = selectedOutCompIds;
+      items = allocations.filter(a => selectedIds.has(a.id));
+      motivoMatch = "presta";
+    }
 
     if (items.length === 0) return;
 
     const totalAmount = items.reduce((acc, curr) => acc + curr.amount, 0);
     const firstItem = items[0];
-    const motivoKey = isTx ? "pendente" : "presta"; // Default to 'presta' for allocations when grouped manually
 
     // For simplicity, let's use the first item's date and a combined description
     const entry: AccountingEntry = {
@@ -311,7 +325,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     // Find parameters (using first item as reference for card matching)
     const param = parameters.find(p =>
       p.cartao.trim().toLowerCase() === cardName.trim().toLowerCase() &&
-      (isTx ? p.motivo.toLowerCase().includes("pendente") : (p.motivo.toLowerCase().includes("presta") || p.motivo.toLowerCase().includes("aloca")))
+      p.motivo.toLowerCase().includes(motivoMatch)
     );
 
     if (param) {
@@ -332,11 +346,13 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     }
 
     const compFormatted = formatCompText(competencia);
-    exportToCSV([entry], `${cardName.replace(/\s/g, '_')} - AGRUPADO_${isTx ? 'FATURA' : 'ALOCACAO'} - ${compFormatted}`, isTx);
+    const filenameSuffix = source === 'fatura' ? 'FATURA' : (source === 'alocacao' ? 'ALOCACAO' : 'FORA_COMP');
+    exportToCSV([entry], `${cardName.replace(/\s/g, '_')} - AGRUPADO_${filenameSuffix} - ${compFormatted}`, isFromFatura);
 
     // Clear selection after export
-    if (isTx) setSelectedTxIds(new Set());
-    else setSelectedAllocIds(new Set());
+    if (source === 'fatura') setSelectedTxIds(new Set());
+    else if (source === 'alocacao') setSelectedAllocIds(new Set());
+    else setSelectedOutCompIds(new Set());
   };
 
   return (
@@ -418,7 +434,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
             <div className="flex items-center space-x-2">
               {selectedTxIds.size > 0 && (
                 <button
-                  onClick={() => handleExportGrouped(true)}
+                  onClick={() => handleExportGrouped('fatura')}
                   className="text-[10px] bg-[#003B71] text-white font-bold px-3 py-1.5 rounded-lg hover:bg-blue-800 transition-colors flex items-center shadow-md active:scale-95"
                 >
                   Agrupar Selecionados ({selectedTxIds.size})
@@ -483,7 +499,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
               <div className="flex items-center space-x-2">
                 {selectedAllocIds.size > 0 && (
                   <button
-                    onClick={() => handleExportGrouped(false)}
+                    onClick={() => handleExportGrouped('alocacao')}
                     className="text-[10px] bg-[#003B71] text-white font-bold px-3 py-1.5 rounded-lg hover:bg-blue-800 transition-colors flex items-center shadow-md active:scale-95"
                   >
                     Agrupar ({selectedAllocIds.size})
@@ -526,7 +542,10 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                   />
                   <div className="truncate pr-4">
                     <p className="text-sm font-bold text-gray-800 truncate">{al.description}</p>
-                    <p className="text-[10px] text-gray-400">{al.date}</p>
+                    <div className="flex space-x-2 text-[10px] text-gray-400">
+                      <span>{al.date}</span>
+                      {al.postingDate && <span className="text-red-500/70 font-semibold">({al.postingDate})</span>}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -585,6 +604,14 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                   CSV Abater
                 </button>
               </div>
+              {selectedOutCompIds.size > 0 && (
+                <button
+                  onClick={() => handleExportGrouped('fora')}
+                  className="text-[10px] bg-[#003B71] text-white font-bold px-3 py-1.5 rounded-lg hover:bg-blue-800 transition-colors flex items-center shadow-md active:scale-95"
+                >
+                  Agrupar ({selectedOutCompIds.size})
+                </button>
+              )}
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[300px] overflow-y-auto">
@@ -599,7 +626,10 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                   />
                   <div className="truncate pr-4">
                     <p className="text-sm font-bold text-gray-800 truncate">{al.description}</p>
-                    <p className="text-[10px] text-purple-500 font-medium">Data original: {al.date}</p>
+                    <div className="flex space-x-2 text-[10px] text-gray-400">
+                      <span>Fato: {al.date}</span>
+                      {al.postingDate && <span className="text-purple-500 font-bold">Lançamento: {al.postingDate}</span>}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">

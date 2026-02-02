@@ -153,12 +153,19 @@ export const dbService = {
 
         if (repError) throw repError;
 
+        const normalizeDate = (d: string) => {
+            if (d && d.includes('/')) {
+                const [day, month, year] = d.split('/');
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            return d;
+        };
+
         // 2. Create Allocations
         const allocsToInsert = allocations.map(a => ({
             report_id: report.id,
-            date: a.date && a.date.includes('/') ?
-                `${a.date.split('/')[2]}-${a.date.split('/')[1].padStart(2, '0')}-${a.date.split('/')[0].padStart(2, '0')}` :
-                a.date,
+            date: normalizeDate(a.date),
+            posting_date: normalizeDate(a.postingDate || ''),
             description: a.description,
             amount: Math.abs(a.amount),
             cost_center: a.costCenter

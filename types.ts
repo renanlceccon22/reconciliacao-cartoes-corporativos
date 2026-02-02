@@ -9,6 +9,7 @@ export interface Transaction {
 export interface Allocation {
   id: string;
   date: string;
+  postingDate?: string;
   description: string;
   amount: number;
   costCenter?: string;
