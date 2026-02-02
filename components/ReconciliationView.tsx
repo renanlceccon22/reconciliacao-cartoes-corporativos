@@ -17,6 +17,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
   const [selectedTxIds, setSelectedTxIds] = useState<Set<string>>(new Set());
   const [selectedAllocIds, setSelectedAllocIds] = useState<Set<string>>(new Set());
   const [selectedOutCompIds, setSelectedOutCompIds] = useState<Set<string>>(new Set());
+  const [exportedIds, setExportedIds] = useState<Set<string>>(new Set());
   const formatCompText = (comp: string) => {
     if (!comp) return '';
     const [year, month] = comp.split('-');
@@ -60,9 +61,14 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
 
     const isSameMonth = (dateStr: string, compStr: string) => {
       if (!dateStr || !compStr) return true;
-      const [day, month, year] = dateStr.split('/');
+      const parts = dateStr.split('/');
+      if (parts.length !== 3) return false;
+
+      const [day, month, year] = parts;
+      const normalizedYear = year.length === 2 ? `20${year}` : year;
+
       const [compYear, compMonth] = compStr.split('-');
-      return month === compMonth && year === compYear;
+      return month === compMonth && normalizedYear === compYear;
     };
 
     const outOfCompAllocations = unmatchedAllocations.filter(al => !isSameMonth(al.postingDate || al.date, competencia));
@@ -140,13 +146,22 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       };
     }).filter(e => e.contaDebito !== '');
 
-    if (entries.length === 0) {
-      alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Pendente".`);
+    // Filter out already exported items
+    const notExportedEntries = entries.filter((_, idx) => !exportedIds.has(reconciliation.unmatchedTransactions[idx].id));
+
+    if (notExportedEntries.length === 0) {
+      if (entries.length > 0) alert("Todos os itens já foram exportados anteriormente.");
+      else alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Pendente".`);
       return;
     }
 
     const compFormatted = formatCompText(competencia);
-    exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, true);
+    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, true);
+
+    // Mark as exported
+    const newExported = new Set(exportedIds);
+    reconciliation.unmatchedTransactions.forEach(tx => newExported.add(tx.id));
+    setExportedIds(newExported);
   };
 
   const handleExportUnmatchedAllocations = () => {
@@ -172,13 +187,22 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       };
     }).filter(e => e.contaDebito !== '');
 
-    if (entries.length === 0) {
-      alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Prestação" ou "Alocação".`);
+    // Filter out already exported items
+    const notExportedEntries = entries.filter((_, idx) => !exportedIds.has(reconciliation.unmatchedAllocations[idx].id));
+
+    if (notExportedEntries.length === 0) {
+      if (entries.length > 0) alert("Todos os itens já foram exportados anteriormente.");
+      else alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Prestação" ou "Alocação".`);
       return;
     }
 
     const compFormatted = formatCompText(competencia);
-    exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, false);
+    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, false);
+
+    // Mark as exported
+    const newExported = new Set(exportedIds);
+    reconciliation.unmatchedAllocations.forEach(al => newExported.add(al.id));
+    setExportedIds(newExported);
   };
 
   const handleExportDevolverAllocations = () => {
@@ -204,14 +228,23 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       };
     }).filter(e => e.contaDebito !== '');
 
-    if (entries.length === 0) {
-      alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Devolver".`);
+    // Filter out already exported items
+    const notExportedEntries = entries.filter((_, idx) => !exportedIds.has(reconciliation.unmatchedAllocations[idx].id));
+
+    if (notExportedEntries.length === 0) {
+      if (entries.length > 0) alert("Todos os itens já foram exportados anteriormente.");
+      else alert(`Erro: Não foram encontrados parâmetros contábeis configurados para o cartão "${cardName}" com o motivo contendo "Devolver".`);
       return;
     }
 
     const futureComp = getNextCompetencia(competencia);
     const compFormatted = formatCompText(futureComp);
-    exportToCSV(entries, `${cardName.replace(/\s/g, '_')} - ${compFormatted} FUTURO`, false);
+    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - ${compFormatted} FUTURO`, false);
+
+    // Mark as exported
+    const newExported = new Set(exportedIds);
+    reconciliation.unmatchedAllocations.forEach(al => newExported.add(al.id));
+    setExportedIds(newExported);
   };
 
   const exportToPDF = (items: any[], title: string, filenameSuffix: string, showBatchColumn: boolean = false) => {
@@ -364,17 +397,25 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
         restricaoDebito: param?.restricaoDebito || '',
         restricaoCredito: param?.restricaoCredito || '',
       };
-    }).filter(e => e.contaDebito !== '');
+    }).filter(e => e && e.contaDebito !== '') as AccountingEntry[];
 
-    if (entriesToExport.length === 0) {
+    // Filter out filtered by exportedIds logic above (already null)
+    const notExportedEntries = entriesToExport;
+
+    if (notExportedEntries.length === 0) {
       alert(`Parâmetros não encontrados para movito: ${motiveType}`);
       return;
     }
 
     const compFormatted = formatCompText(competencia);
     const suffix = motiveType === 'presta' ? 'PRESTACAO' : (motiveType === 'devolver' ? 'DEVOLVER' : 'ABATER');
-    exportToCSV(entriesToExport, `${cardName.replace(/\s/g, '_')} - FORA_COMPETENCIA_${suffix} - ${compFormatted}`, false);
+    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - FORA_COMPETENCIA_${suffix} - ${compFormatted}`, false);
     setSelectedOutCompIds(new Set());
+
+    // Mark as exported
+    const newExported = new Set(exportedIds);
+    items.forEach(al => newExported.add(al.id));
+    setExportedIds(newExported);
   };
 
   const handleExportGrouped = (source: 'fatura' | 'alocacao' | 'fora') => {
@@ -443,6 +484,11 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     if (source === 'fatura') setSelectedTxIds(new Set());
     else if (source === 'alocacao') setSelectedAllocIds(new Set());
     else setSelectedOutCompIds(new Set());
+
+    // Mark as exported
+    const newExported = new Set(exportedIds);
+    items.forEach(i => newExported.add(i.id));
+    setExportedIds(newExported);
   };
 
   return (
@@ -555,34 +601,40 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[400px] overflow-y-auto">
-            {reconciliation.unmatchedTransactions.map((tx, idx) => (
-              <div key={idx} className="p-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-orange-50/20 group">
-                <div className="flex items-center space-x-3 truncate">
-                  <input
-                    type="checkbox"
-                    checked={selectedTxIds.has(tx.id)}
-                    onChange={() => handleToggleSelectTx(tx.id)}
-                    className="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <div className="truncate pr-4">
-                    <p className="text-sm font-bold text-gray-800 truncate">{tx.description}</p>
-                    <p className="text-[10px] text-gray-400">{tx.date}</p>
+            {reconciliation.unmatchedTransactions.map((tx, idx) => {
+              const isExported = exportedIds.has(tx.id);
+              return (
+                <div key={idx} className={`p-3 border-b border-gray-50 last:border-0 flex justify-between items-center group ${isExported ? 'bg-gray-100 opacity-60' : 'hover:bg-orange-50/20'}`}>
+                  <div className="flex items-center space-x-3 truncate">
+                    <input
+                      type="checkbox"
+                      checked={selectedTxIds.has(tx.id)}
+                      onChange={() => handleToggleSelectTx(tx.id)}
+                      className="h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      disabled={isExported}
+                    />
+                    <div className="truncate pr-4">
+                      <p className={`text-sm font-bold truncate ${isExported ? 'text-gray-500' : 'text-gray-800'}`}>
+                        {isExported ? `(BAIXADO) ${tx.description}` : tx.description}
+                      </p>
+                      <p className="text-[10px] text-gray-400">{tx.date}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    <button
+                      onClick={() => handleToggleIgnore(tx.id)}
+                      className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Desconsiderar Lançamento"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{tx.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                  <button
-                    onClick={() => handleToggleIgnore(tx.id)}
-                    className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Desconsiderar Lançamento"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {reconciliation.unmatchedTransactions.length === 0 && (
               <div className="p-8 text-center text-gray-300">Tudo ok na fatura.</div>
             )}
@@ -638,37 +690,43 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
             )}
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[400px] overflow-y-auto">
-            {reconciliation.unmatchedAllocations.map((al, idx) => (
-              <div key={idx} className="p-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-red-50/20 group">
-                <div className="flex items-center space-x-3 truncate">
-                  <input
-                    type="checkbox"
-                    checked={selectedAllocIds.has(al.id)}
-                    onChange={() => handleToggleSelectAlloc(al.id)}
-                    className="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                  />
-                  <div className="truncate pr-4">
-                    <p className="text-sm font-bold text-gray-800 truncate">{al.description}</p>
-                    <div className="flex space-x-2 text-[10px] text-gray-400">
-                      <span>{al.date}</span>
-                      {al.postingDate && <span className="text-red-500/70 font-semibold">({al.postingDate})</span>}
+            {reconciliation.unmatchedAllocations.map((al, idx) => {
+              const isExported = exportedIds.has(al.id);
+              return (
+                <div key={idx} className={`p-3 border-b border-gray-50 last:border-0 flex justify-between items-center group ${isExported ? 'bg-gray-100 opacity-60' : 'hover:bg-red-50/20'}`}>
+                  <div className="flex items-center space-x-3 truncate">
+                    <input
+                      type="checkbox"
+                      checked={selectedAllocIds.has(al.id)}
+                      onChange={() => handleToggleSelectAlloc(al.id)}
+                      className="h-4 w-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                      disabled={isExported}
+                    />
+                    <div className="truncate pr-4">
+                      <p className={`text-sm font-bold truncate ${isExported ? 'text-gray-500' : 'text-gray-800'}`}>
+                        {isExported ? `(BAIXADO) ${al.description}` : al.description}
+                      </p>
+                      <div className="flex space-x-2 text-[10px] text-gray-400">
+                        <span>{al.date}</span>
+                        {al.postingDate && <span className="text-red-500/70 font-semibold">({al.postingDate})</span>}
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{al.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    <button
+                      onClick={() => handleToggleIgnore(al.id)}
+                      className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Desconsiderar Lançamento"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{al.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                  <button
-                    onClick={() => handleToggleIgnore(al.id)}
-                    className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Desconsiderar Lançamento"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {reconciliation.unmatchedAllocations.length === 0 && (
               <div className="p-8 text-center text-gray-300">Sem sobras de alocação.</div>
             )}
@@ -728,37 +786,43 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden max-h-[300px] overflow-y-auto">
-            {reconciliation.outOfCompAllocations.map((al, idx) => (
-              <div key={idx} className="p-3 border-b border-gray-50 last:border-0 flex justify-between items-center hover:bg-purple-50/20 group">
-                <div className="flex items-center space-x-3 truncate">
-                  <input
-                    type="checkbox"
-                    checked={selectedOutCompIds.has(al.id)}
-                    onChange={() => handleToggleSelectOutComp(al.id)}
-                    className="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                  />
-                  <div className="truncate pr-4">
-                    <p className="text-sm font-bold text-gray-800 truncate">{al.description}</p>
-                    <div className="flex space-x-2 text-[10px] text-gray-400">
-                      <span>Fato: {al.date}</span>
-                      {al.postingDate && <span className="text-purple-500 font-bold">Lançamento: {al.postingDate}</span>}
+            {reconciliation.outOfCompAllocations.map((al, idx) => {
+              const isExported = exportedIds.has(al.id);
+              return (
+                <div key={idx} className={`p-3 border-b border-gray-50 last:border-0 flex justify-between items-center group ${isExported ? 'bg-gray-100 opacity-60' : 'hover:bg-purple-50/20'}`}>
+                  <div className="flex items-center space-x-3 truncate">
+                    <input
+                      type="checkbox"
+                      checked={selectedOutCompIds.has(al.id)}
+                      onChange={() => handleToggleSelectOutComp(al.id)}
+                      className="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      disabled={isExported}
+                    />
+                    <div className="truncate pr-4">
+                      <p className={`text-sm font-bold truncate ${isExported ? 'text-gray-500' : 'text-gray-800'}`}>
+                        {isExported ? `(BAIXADO) ${al.description}` : al.description}
+                      </p>
+                      <div className="flex space-x-2 text-[10px] text-gray-400">
+                        <span>Fato: {al.date}</span>
+                        {al.postingDate && <span className="text-purple-500 font-bold">Lançamento: {al.postingDate}</span>}
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{al.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    <button
+                      onClick={() => handleToggleIgnore(al.id)}
+                      className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Desconsiderar Lançamento"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{al.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                  <button
-                    onClick={() => handleToggleIgnore(al.id)}
-                    className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Desconsiderar Lançamento"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
