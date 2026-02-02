@@ -24,10 +24,9 @@ const CardsManager: React.FC<CardsManagerProps> = ({ cards, onAddCard, onRemoveC
   };
 
   const downloadTemplateCSV = () => {
-    // Usando ponto e vírgula para melhor compatibilidade com Excel BR
-    const headers = "Nome;Subconta\n";
-    const exampleRows = "Bradesco Infinite - COAG;767902\nSantander - Sede;6637\nBradesco Corporativo - EAC;867900";
-    const blob = new Blob([headers + exampleRows], { type: 'text/csv;charset=iso-8859-1;' });
+    const headers = "Nome,Subconta\n";
+    const exampleRows = "Bradesco Infinite - COAG,767902\nSantander - Sede,6637\nBradesco Corporativo - EAC,867900";
+    const blob = new Blob([headers + exampleRows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);

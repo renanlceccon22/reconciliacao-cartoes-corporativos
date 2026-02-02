@@ -1,8 +1,8 @@
-
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Transaction, Allocation, ReconciledPair, AccountingParameter, AccountingEntry } from '../types';
+import { dbService } from '../services/dbService';
 
 interface ReconciliationViewProps {
   transactions: Transaction[];
@@ -18,6 +18,20 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
   const [selectedAllocIds, setSelectedAllocIds] = useState<Set<string>>(new Set());
   const [selectedOutCompIds, setSelectedOutCompIds] = useState<Set<string>>(new Set());
   const [exportedIds, setExportedIds] = useState<Set<string>>(new Set());
+
+  // persistent loading of ignored items per card/comp
+  useEffect(() => {
+    const loadIgnored = async () => {
+      if (!cardName || !competencia) return;
+      try {
+        const ids = await dbService.getIgnoredIds(cardName, competencia);
+        setIgnoredIds(new Set(ids));
+      } catch (err) {
+        console.error("Erro ao carregar itens ignorados:", err);
+      }
+    };
+    loadIgnored();
+  }, [cardName, competencia]);
   const formatCompText = (comp: string) => {
     if (!comp) return '';
     const [year, month] = comp.split('-');
@@ -106,7 +120,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return [lineDebit, lineCredit];
     }).join("\n");
 
-    // Blob com BOM para UTF-8 para garantir acentuação no Excel
+    // Blob com BOM (\uFEFF) para garantir colunas e acentuação correta no Excel Brasil
     const blob = new Blob(["\uFEFF" + a1Line + rows], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -287,7 +301,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
         item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
       ];
       if (showBatchColumn) {
-        row.push("________________"); // Espaço para preenchimento
+        row.push(item.batch || "N/A");
       }
       return row;
     });
@@ -335,13 +349,25 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     doc.save(`${cardName.replace(/\s/g, '_')} - ${filenameSuffix} - ${compFormatted}.pdf`);
   };
 
-  const handleToggleIgnore = (id: string) => {
+  const handleToggleIgnore = async (id: string) => {
+    const isIgnoring = !ignoredIds.has(id);
+
     setIgnoredIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+
+    try {
+      if (isIgnoring) {
+        await dbService.saveIgnoredId(cardName, competencia, id);
+      } else {
+        await dbService.removeIgnoredId(cardName, competencia, id);
+      }
+    } catch (err) {
+      console.error("Erro ao persistir status de ignorado:", err);
+    }
   };
 
   const handleToggleSelectTx = (id: string) => {
@@ -706,9 +732,10 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                       <p className={`text-sm font-bold truncate ${isExported ? 'text-gray-500' : 'text-gray-800'}`}>
                         {isExported ? `(BAIXADO) ${al.description}` : al.description}
                       </p>
-                      <div className="flex space-x-2 text-[10px] text-gray-400">
+                      <div className="flex space-x-2 items-center text-[10px] text-gray-400">
                         <span>{al.date}</span>
                         {al.postingDate && <span className="text-red-500/70 font-semibold">({al.postingDate})</span>}
+                        {al.batch && <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-bold ml-1">LOTE: {al.batch}</span>}
                       </div>
                     </div>
                   </div>
@@ -802,9 +829,10 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
                       <p className={`text-sm font-bold truncate ${isExported ? 'text-gray-500' : 'text-gray-800'}`}>
                         {isExported ? `(BAIXADO) ${al.description}` : al.description}
                       </p>
-                      <div className="flex space-x-2 text-[10px] text-gray-400">
+                      <div className="flex space-x-2 items-center text-[10px] text-gray-400">
                         <span>Fato: {al.date}</span>
                         {al.postingDate && <span className="text-purple-500 font-bold">Lançamento: {al.postingDate}</span>}
+                        {al.batch && <span className="bg-purple-50 px-1.5 py-0.5 rounded text-purple-600 font-bold ml-1">LOTE: {al.batch}</span>}
                       </div>
                     </div>
                   </div>

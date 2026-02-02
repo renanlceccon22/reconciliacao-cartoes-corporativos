@@ -54,10 +54,10 @@ const ParametersManager: React.FC<ParametersManagerProps> = ({
   };
 
   const downloadTemplateCSV = () => {
-    const headers = "Cartao,Motivo,ContaDebito,ContaCredito,SubcontaDebito,SubcontaCredito,Fundo,DepartamentoDebito,DepartamentoCredito,RestricaoDebito,RestricaoCredito\n";
+    const headers = "Cartao;Motivo;ContaDebito;ContaCredito;SubcontaDebito;SubcontaCredito;Fundo;DepartamentoDebito;DepartamentoCredito;RestricaoDebito;RestricaoCredito\n";
     const exampleCard = cards.length > 0 ? cards[0].name : "Bradesco Infinite - COAG";
-    const exampleRow = `${exampleCard},Lançar na prestação de contas,2139009,2139090,767902,767902,10,1310001,1310001,0A,0A`;
-    const blob = new Blob([headers + exampleRow], { type: 'text/csv;charset=utf-8;' });
+    const exampleRow = `${exampleCard};Lançar na prestação de contas;2139009;2139090;767902;767902;10;1310001;1310001;0A;0A`;
+    const blob = new Blob(["\uFEFF" + headers + exampleRow], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);

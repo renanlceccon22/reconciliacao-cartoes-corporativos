@@ -127,20 +127,45 @@ const App: React.FC = () => {
   // Check for existing data in DB when selection changes
   useEffect(() => {
     const checkExistingData = async () => {
-      setExistingInvoiceData(null);
-      setExistingAllocationData(null);
       if (!selectedUploadCard || !selectedPeriod) return;
 
+      setStatus(AppStatus.LOADING);
       try {
         const [inv, alloc] = await Promise.all([
           dbService.getInvoice(selectedUploadCard, selectedPeriod),
           dbService.getAllocationReport(selectedUploadCard, selectedPeriod)
         ]);
 
-        if (inv) setExistingInvoiceData(inv);
-        if (alloc) setExistingAllocationData(alloc);
+        if (inv) {
+          setInvoiceResult({
+            cartaoVenculado: inv.card_name,
+            competencia: inv.competencia,
+            totalAmount: inv.total_amount,
+            transactions: inv.transactions
+          });
+          setExistingInvoiceData(inv);
+        } else {
+          setInvoiceResult(null);
+          setExistingInvoiceData(null);
+        }
+
+        if (alloc) {
+          setAllocationResult({
+            cartaoVenculado: alloc.card_name,
+            competencia: alloc.competencia,
+            totalAmount: alloc.total_amount,
+            allocations: alloc.allocations
+          });
+          setExistingAllocationData(alloc);
+        } else {
+          setAllocationResult(null);
+          setExistingAllocationData(null);
+        }
+
+        setStatus(AppStatus.IDLE);
       } catch (err) {
         console.error("Erro ao verificar histórico:", err);
+        setStatus(AppStatus.IDLE);
       }
     };
     checkExistingData();
@@ -211,9 +236,9 @@ const App: React.FC = () => {
         console.error("Erro no upload do arquivo:", upErr);
       }
 
-      // Save to Supabase
+      // Save to Supabase (UPSERT)
       try {
-        await dbService.saveInvoice(selectedUploadCard, selectedPeriod, fullResult.totalAmount, fullResult.transactions, fileUrl);
+        await dbService.upsertInvoice(selectedUploadCard, selectedPeriod, fullResult.totalAmount, fullResult.transactions, fileUrl);
         // Refresh existing data check
         const inv = await dbService.getInvoice(selectedUploadCard, selectedPeriod);
         if (inv) setExistingInvoiceData(inv);
@@ -258,9 +283,9 @@ const App: React.FC = () => {
         console.error("Erro no upload do arquivo:", upErr);
       }
 
-      // Save to Supabase
+      // Save to Supabase (UPSERT)
       try {
-        await dbService.saveAllocationReport(selectedUploadCard, selectedPeriod, fullAllocResult.totalAmount, fullAllocResult.allocations, fileUrl);
+        await dbService.upsertAllocationReport(selectedUploadCard, selectedPeriod, fullAllocResult.totalAmount, fullAllocResult.allocations, fileUrl);
         // Refresh existing data check
         const alloc = await dbService.getAllocationReport(selectedUploadCard, selectedPeriod);
         if (alloc) setExistingAllocationData(alloc);

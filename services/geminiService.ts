@@ -67,10 +67,11 @@ export const extractAllocationData = async (files: SourceFile[]): Promise<Alloca
     - Não escreva NENHUMA palavra fora do JSON.
     - Não use crase, markdown (\`\`\`json) ou comentários.
     - Analise os arquivos de ALOCAÇÃO CONTÁBIL anexados.
-    - Capture: Data do Histórico (ocorrência), Data de Lançamento (contábil), Descrição/Histórico, Valor (R$) e Centro de Custo (se disponível).
+    - Capture: Data do Histórico (ocorrência), Data de Lançamento (contábil), Descrição/Histórico, Valor (R$), Centro de Custo e **Lote Contábil** (ex: MB-16, MI-20, ME-05, MR-10).
     - Converta valores para números decimais (ex: 1250.50).
     - IMPORTANTE: Todos os valores devem ser SEMPRE POSITIVOS (remova o sinal de menos se houver).
     - Ignore cabeçalhos e totais, foque nas linhas de lançamento.
+    - O Lote Contábil costuma seguir o padrão de duas letras (MB, MI, ME, MR, etc.) seguidas de hífen e número.
     - Gere um ID único curto para cada alocação.
     
     Sua resposta deve começar com { e terminar com }.
@@ -79,7 +80,7 @@ export const extractAllocationData = async (files: SourceFile[]): Promise<Alloca
     {
       "totalAmount": 0.0,
       "allocations": [
-        { "id": "id_curto", "date": "DD/MM/YYYY", "postingDate": "DD/MM/YYYY", "description": "HISTÓRICO", "amount": 0.0, "costCenter": "OPCIONAL" }
+        { "id": "id_curto", "date": "DD/MM/YYYY", "postingDate": "DD/MM/YYYY", "description": "HISTÓRICO", "amount": 0.0, "costCenter": "OPCIONAL", "batch": "LOTE_CONTABIL" }
       ]
     }
     

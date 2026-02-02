@@ -13,6 +13,7 @@ export interface Allocation {
   description: string;
   amount: number;
   costCenter?: string;
+  batch?: string;
 }
 
 export interface Card {

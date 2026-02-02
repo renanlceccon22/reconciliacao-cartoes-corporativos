@@ -10,9 +10,9 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions }) => 
   const total = transactions.reduce((acc, curr) => acc + curr.amount, 0);
 
   const handleExportCSV = () => {
-    const headers = "Data,Histórico,Valor (R$)\n";
-    const rows = transactions.map(t => `${t.date},${t.description.replace(/,/g, '')},${t.amount.toFixed(2)}`).join("\n");
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const headers = "Data;Histórico;Valor (Centavos)\n";
+    const rows = transactions.map(t => `${t.date};"${t.description.replace(/"/g, '""')}";${Math.round(t.amount * 100)}`).join("\n");
+    const blob = new Blob(["\uFEFF" + headers + rows], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
@@ -27,7 +27,7 @@ const TransactionTable: React.FC<TransactionTableProps> = ({ transactions }) => 
     <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
       <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
         <h3 className="font-semibold text-gray-700">Dados Extraídos</h3>
-        <button 
+        <button
           onClick={handleExportCSV}
           className="text-sm bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors flex items-center"
         >

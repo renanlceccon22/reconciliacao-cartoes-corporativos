@@ -29,7 +29,12 @@ const AllocationTable: React.FC<AllocationTableProps> = ({ allocations }) => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{a.date}</td>
                 <td className="px-6 py-4 text-sm text-gray-900 font-medium">
                   {a.description}
-                  {a.costCenter && <span className="block text-xs text-gray-400 font-normal">{a.costCenter}</span>}
+                  {(a.costCenter || a.batch) && (
+                    <div className="flex space-x-2 text-xs text-gray-400 font-normal mt-0.5">
+                      {a.costCenter && <span>C.C: {a.costCenter}</span>}
+                      {a.batch && <span className="text-blue-500 font-semibold">Lote: {a.batch}</span>}
+                    </div>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
                   {a.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

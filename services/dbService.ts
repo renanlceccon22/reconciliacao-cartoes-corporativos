@@ -119,16 +119,17 @@ export const dbService = {
         if (error) throw error;
     },
 
+    // Utility
+    normalizeToIsoDate(d: string) {
+        if (d && d.includes('/')) {
+            const [day, month, year] = d.split('/');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        return d;
+    },
+
     // Invoices & Transactions
     async saveInvoice(cardName: string, competencia: string, totalAmount: number, transactions: Transaction[], filePath?: string) {
-        const normalizeDate = (d: string) => {
-            if (d && d.includes('/')) {
-                const [day, month, year] = d.split('/');
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            }
-            return d;
-        };
-
         // 1. Create Invoice Header
         const { data: invoice, error: invError } = await supabase
             .from('invoices')
@@ -141,7 +142,7 @@ export const dbService = {
         // 2. Create Transactions
         const txsToInsert = transactions.map(t => ({
             invoice_id: invoice.id,
-            date: normalizeDate(t.date),
+            date: this.normalizeToIsoDate(t.date),
             description: t.description,
             amount: t.amount
         }));
@@ -152,6 +153,35 @@ export const dbService = {
 
         if (txError) throw txError;
         return invoice.id;
+    },
+
+    async upsertInvoice(cardName: string, competencia: string, totalAmount: number, transactions: Transaction[], filePath?: string) {
+        const { data: existing } = await supabase
+            .from('invoices')
+            .select('id')
+            .eq('card_name', cardName)
+            .eq('competencia', competencia)
+            .maybeSingle();
+
+        if (existing) {
+            const { error: updError } = await supabase
+                .from('invoices')
+                .update({ total_amount: totalAmount, file_path: filePath })
+                .eq('id', existing.id);
+            if (updError) throw updError;
+
+            await supabase.from('transactions').delete().eq('invoice_id', existing.id);
+            const txsToInsert = transactions.map(t => ({
+                invoice_id: existing.id,
+                date: this.normalizeToIsoDate(t.date),
+                description: t.description,
+                amount: t.amount
+            }));
+            await supabase.from('transactions').insert(txsToInsert);
+            return existing.id;
+        } else {
+            return this.saveInvoice(cardName, competencia, totalAmount, transactions, filePath);
+        }
     },
 
     async getInvoice(cardName: string, competencia: string) {
@@ -166,7 +196,7 @@ export const dbService = {
 
         if (error) {
             if (error.code === 'PGRST116') return null;
-            return null; // Handle other errors gracefully or throw
+            return null;
         }
 
         const { data: transactions, error: txError } = await supabase
@@ -176,12 +206,10 @@ export const dbService = {
 
         if (txError) throw txError;
 
-        // Map transactions back to frontend format
         const formattedTxs: Transaction[] = transactions.map(t => {
-            // date is YYYY-MM-DD from DB
             const [year, month, day] = t.date.split('-');
             return {
-                id: t.id,
+                id: String(t.id),
                 date: `${day}/${month}/${year}`,
                 description: t.description,
                 amount: t.amount
@@ -193,7 +221,6 @@ export const dbService = {
 
     // Allocations
     async saveAllocationReport(cardName: string, competencia: string, totalAmount: number, allocations: Allocation[], filePath?: string) {
-        // 1. Create Report Header
         const { data: report, error: repError } = await supabase
             .from('allocations_reports')
             .insert([{ card_name: cardName, competencia, total_amount: totalAmount, file_path: filePath }])
@@ -202,22 +229,14 @@ export const dbService = {
 
         if (repError) throw repError;
 
-        const normalizeDate = (d: string) => {
-            if (d && d.includes('/')) {
-                const [day, month, year] = d.split('/');
-                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            }
-            return d;
-        };
-
-        // 2. Create Allocations
         const allocsToInsert = allocations.map(a => ({
             report_id: report.id,
-            date: normalizeDate(a.date),
-            posting_date: normalizeDate(a.postingDate || ''),
+            date: this.normalizeToIsoDate(a.date),
+            posting_date: this.normalizeToIsoDate(a.postingDate || ''),
             description: a.description,
             amount: Math.abs(a.amount),
-            cost_center: a.costCenter
+            cost_center: a.costCenter,
+            batch: a.batch
         }));
 
         const { error: allocError } = await supabase
@@ -226,6 +245,38 @@ export const dbService = {
 
         if (allocError) throw allocError;
         return report.id;
+    },
+
+    async upsertAllocationReport(cardName: string, competencia: string, totalAmount: number, allocations: Allocation[], filePath?: string) {
+        const { data: existing } = await supabase
+            .from('allocations_reports')
+            .select('id')
+            .eq('card_name', cardName)
+            .eq('competencia', competencia)
+            .maybeSingle();
+
+        if (existing) {
+            const { error: updError } = await supabase
+                .from('allocations_reports')
+                .update({ total_amount: totalAmount, file_path: filePath })
+                .eq('id', existing.id);
+            if (updError) throw updError;
+
+            await supabase.from('allocations').delete().eq('report_id', existing.id);
+            const allocsToInsert = allocations.map(a => ({
+                report_id: existing.id,
+                date: this.normalizeToIsoDate(a.date),
+                posting_date: this.normalizeToIsoDate(a.postingDate || ''),
+                description: a.description,
+                amount: Math.abs(a.amount),
+                cost_center: a.costCenter,
+                batch: a.batch
+            }));
+            await supabase.from('allocations').insert(allocsToInsert);
+            return existing.id;
+        } else {
+            return this.saveAllocationReport(cardName, competencia, totalAmount, allocations, filePath);
+        }
     },
 
     async getAllocationReport(cardName: string, competencia: string) {
@@ -258,16 +309,43 @@ export const dbService = {
                 postingFormatted = `${pd}/${pm}/${py}`;
             }
             return {
-                id: a.id,
+                id: String(a.id),
                 date: `${day}/${month}/${year}`,
                 postingDate: postingFormatted,
                 description: a.description,
                 amount: a.amount,
                 costCenter: a.cost_center,
-                project: '' // Assuming project is not stored or mapped
+                batch: a.batch
             };
         });
 
         return { ...report, allocations: formattedAllocs };
+    },
+
+    // Reconciliation / Ignored Items
+    async getIgnoredIds(cardName: string, competencia: string): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('ignored_items')
+            .select('item_id')
+            .eq('card_name', cardName)
+            .eq('competencia', competencia);
+
+        if (error) return [];
+        return data.map(d => d.item_id);
+    },
+
+    async saveIgnoredId(cardName: string, competencia: string, itemId: string) {
+        await supabase
+            .from('ignored_items')
+            .upsert({ card_name: cardName, competencia, item_id: itemId });
+    },
+
+    async removeIgnoredId(cardName: string, competencia: string, itemId: string) {
+        await supabase
+            .from('ignored_items')
+            .delete()
+            .eq('card_name', cardName)
+            .eq('competencia', competencia)
+            .eq('item_id', itemId);
     }
 };
