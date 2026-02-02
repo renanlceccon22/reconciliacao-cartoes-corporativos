@@ -13,13 +13,32 @@ export const extractStatementData = async (files: SourceFile[]): Promise<Extract
   `;
 
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-extract', {
-      body: { prompt, files }
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_-TZ8pcakA54YaMuIVKIQ8A_-0hp4wfM";
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/gemini-extract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey,
+        'Authorization': `Bearer ${session?.access_token || anonKey}`
+      },
+      body: JSON.stringify({ prompt, files })
     });
 
-    if (error) throw error;
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Sessão expirada ou acesso negado (401). Recarregue a página e tente novamente.");
+      }
+      const errData = await response.json().catch(() => ({}));
+      console.error("Fetch Error Details:", errData);
+      throw new Error(`Erro na IA (Status ${response.status}): ${errData.error || 'Falha na comunicação'}`);
+    }
+
+    const data = await response.json();
     return data as ExtractionResult;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Extraction Error:", error);
     throw error;
   }
@@ -35,13 +54,32 @@ export const extractAllocationData = async (files: SourceFile[]): Promise<Alloca
   `;
 
   try {
-    const { data, error } = await supabase.functions.invoke('gemini-extract', {
-      body: { prompt, files }
+    const { data: { session } } = await supabase.auth.getSession();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_-TZ8pcakA54YaMuIVKIQ8A_-0hp4wfM";
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/gemini-extract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey,
+        'Authorization': `Bearer ${session?.access_token || anonKey}`
+      },
+      body: JSON.stringify({ prompt, files })
     });
 
-    if (error) throw error;
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Sessão expirada (Alocação). Recarregue a página.");
+      }
+      const errData = await response.json().catch(() => ({}));
+      console.error("Fetch Allocation Error Details:", errData);
+      throw new Error(`Erro na IA Alocação (Status ${response.status}): ${errData.error || 'Falha na comunicação'}`);
+    }
+
+    const data = await response.json();
     return data as AllocationExtractionResult;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Allocation Extraction Error:", error);
     throw error;
   }

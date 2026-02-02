@@ -161,8 +161,9 @@ const App: React.FC = () => {
 
       setStatus(AppStatus.SUCCESS);
       setActiveTab('faturas');
-    } catch (error) {
-      setErrorMessage("Erro ao processar faturas.");
+    } catch (error: any) {
+      console.error("Erro no processamento:", error);
+      setErrorMessage(error.message || "Erro ao processar faturas.");
       setStatus(AppStatus.ERROR);
     }
   };
@@ -193,8 +194,9 @@ const App: React.FC = () => {
 
       setStatus(AppStatus.SUCCESS);
       setActiveTab('alocacoes');
-    } catch (error) {
-      setErrorMessage("Erro ao processar alocações.");
+    } catch (error: any) {
+      console.error("Erro no processamento de alocações:", error);
+      setErrorMessage(error.message || "Erro ao processar alocações.");
       setStatus(AppStatus.ERROR);
     }
   };
