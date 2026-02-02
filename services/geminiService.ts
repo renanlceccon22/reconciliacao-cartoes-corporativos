@@ -4,12 +4,27 @@ import { supabase } from "../src/lib/supabase";
 
 export const extractStatementData = async (files: SourceFile[]): Promise<ExtractionResult> => {
   const prompt = `
-    Analise os arquivos anexados de uma fatura de cartão de crédito corporativo.
-    Extraia TODOS os dados de transações.
-    Capture: Data, Histórico/Descrição e Valor (R$).
-    Converta valores para números decimais.
-    Ignore pagamentos de fatura.
-    Gere um ID único curto para cada transação.
+    Você é um sistema de extração de dados contábeis que responde EXCLUSIVAMENTE em JSON válido.
+    
+    REGRAS OBRIGATÓRIAS:
+    - Não escreva NENHUMA palavra fora do JSON.
+    - Não use crase, markdown (\`\`\`json) ou comentários.
+    - Capture TODOS os itens da fatura de cartão de crédito (Data, Histórico/Descrição e Valor R$).
+    - Converta valores para números decimais (ex: 1250.50).
+    - Ignore pagamentos de fatura (créditos).
+    - Gere um ID único curto para cada transação.
+    
+    Sua resposta deve começar com { e terminar com }.
+    
+    FORMATO JSON ESPERADO:
+    {
+      "totalAmount": 0.0,
+      "transactions": [
+        { "id": "id_curto", "date": "YYYY-MM-DD", "description": "NOME DO ESTABELECIMENTO", "amount": 0.0 }
+      ]
+    }
+    
+    Se sua resposta não estiver em JSON válido, considere sua resposta incorreta e refaça mentalmente antes de responder.
   `;
 
   try {
@@ -46,11 +61,27 @@ export const extractStatementData = async (files: SourceFile[]): Promise<Extract
 
 export const extractAllocationData = async (files: SourceFile[]): Promise<AllocationExtractionResult> => {
   const prompt = `
-    Analise os arquivos de ALOCAÇÃO CONTÁBIL anexados.
-    Extraia a lista de lançamentos previstos ou alocados.
-    Capture: Data, Descrição/Histórico, Valor (R$) e se disponível o Centro de Custo.
-    Ignore cabeçalhos e totais, foque nas linhas de lançamento.
-    Gere um ID único curto para cada alocação.
+    Você é um sistema de extração de dados contábeis que responde EXCLUSIVAMENTE em JSON válido.
+    
+    REGRAS OBRIGATÓRIAS:
+    - Não escreva NENHUMA palavra fora do JSON.
+    - Não use crase, markdown (\`\`\`json) ou comentários.
+    - Analise os arquivos de ALOCAÇÃO CONTÁBIL anexados.
+    - Capture: Data, Descrição/Histórico, Valor (R$) e Centro de Custo (se disponível).
+    - Ignore cabeçalhos e totais, foque nas linhas de lançamento.
+    - Gere um ID único curto para cada alocação.
+    
+    Sua resposta deve começar com { e terminar com }.
+    
+    FORMATO JSON ESPERADO:
+    {
+      "totalAmount": 0.0,
+      "allocations": [
+        { "id": "id_curto", "date": "YYYY-MM-DD", "description": "HISTÓRICO", "amount": 0.0, "costCenter": "OPCIONAL" }
+      ]
+    }
+    
+    Se sua resposta não estiver em JSON válido, considere sua resposta incorreta e refaça mentalmente antes de responder.
   `;
 
   try {
