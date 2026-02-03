@@ -280,37 +280,33 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     const compText = formatCompText(competencia);
 
     // Design Profissional - Cabeçalho
-    doc.setFontSize(18);
-    doc.setTextColor(0, 59, 113);
-    doc.setFont('helvetica', 'bold');
-    doc.text("ANRS Contabilidade", 14, 25);
 
     doc.setFontSize(22);
     doc.setTextColor(40);
     doc.setFont('helvetica', 'bold');
-    doc.text("Relatório Contábil", 14, 45);
+    doc.text("Relatório Contábil", 14, 25);
 
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.setFont('helvetica', 'normal');
-    doc.text(`EMITIDO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 52);
+    doc.text(`EMITIDO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 32);
 
     // Linha divisória
     doc.setDrawColor(0, 59, 113);
     doc.setLineWidth(0.5);
-    doc.line(14, 55, 196, 55);
+    doc.line(14, 35, 196, 35);
 
     // Informações do Relatório
     doc.setFontSize(12);
     doc.setTextColor(60);
     doc.setFont('helvetica', 'bold');
-    doc.text(title.toUpperCase(), 14, 65);
+    doc.text(title.toUpperCase(), 14, 45);
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80);
-    doc.text(`Cartão Corporativo: ${cardName}`, 14, 72);
-    doc.text(`Competência: ${compText}`, 14, 78);
+    doc.text(`Cartão Corporativo: ${cardName}`, 14, 52);
+    doc.text(`Competência: ${compText}`, 14, 58);
 
     const tableHeaders = [["DATA", "DESCRIÇÃO / HISTÓRICO", "VALOR"]];
     if (showBatchColumn) {
@@ -330,7 +326,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     });
 
     autoTable(doc, {
-      startY: 85,
+      startY: 65,
       head: tableHeaders,
       body: tableData,
       theme: 'grid',
@@ -356,7 +352,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       alternateRowStyles: {
         fillColor: [245, 247, 249]
       },
-      margin: { top: 60, left: 14, right: 14 },
+      margin: { top: 40, left: 14, right: 14 },
       didDrawPage: (data) => {
         const pageCount = (doc as any).internal.getNumberOfPages();
         doc.setFontSize(8);
