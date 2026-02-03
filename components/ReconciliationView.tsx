@@ -279,19 +279,11 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     const doc = new jsPDF();
     const compText = formatCompText(competencia);
 
-    // Design Profissional - Cabeçalho com detalhe de marca
-    doc.setFillColor(0, 59, 113); // Navy Blue
-    doc.rect(14, 15, 2, 20, 'F'); // Pequeno detalhe vertical
-
+    // Design Profissional - Cabeçalho
     doc.setFontSize(18);
     doc.setTextColor(0, 59, 113);
     doc.setFont('helvetica', 'bold');
-    doc.text("ANRS Contabilidade", 20, 22);
-
-    doc.setFontSize(9);
-    doc.setTextColor(120);
-    doc.setFont('helvetica', 'normal');
-    doc.text("Assessoria e Consultoria Contábil", 20, 27);
+    doc.text("ANRS Contabilidade", 14, 25);
 
     doc.setFontSize(22);
     doc.setTextColor(40);
