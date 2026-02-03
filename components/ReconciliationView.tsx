@@ -169,8 +169,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return;
     }
 
-    const compFormatted = formatCompText(competencia);
-    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, true);
+    const finalFilename = getFormattedFilename('CSV_FATURA', cardName, competencia);
+    exportToCSV(notExportedEntries, finalFilename, true);
 
     // Mark as exported
     const newExported = new Set(exportedIds);
@@ -210,8 +210,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return;
     }
 
-    const compFormatted = formatCompText(competencia);
-    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - ${compFormatted}`, false);
+    const finalFilename = getFormattedFilename('CSV_ALOCACAO', cardName, competencia);
+    exportToCSV(notExportedEntries, finalFilename, false);
 
     // Mark as exported
     const newExported = new Set(exportedIds);
@@ -252,8 +252,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     }
 
     const futureComp = getNextCompetencia(competencia);
-    const compFormatted = formatCompText(futureComp);
-    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - ${compFormatted} FUTURO`, false);
+    const finalFilename = getFormattedFilename('CSV_ALOCACAO_FUTURO', cardName, futureComp);
+    exportToCSV(notExportedEntries, finalFilename, false);
 
     // Mark as exported
     const newExported = new Set(exportedIds);
@@ -261,33 +261,64 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     setExportedIds(newExported);
   };
 
+  const getFormattedFilename = (typePrefix: string, baseName: string, comp: string) => {
+    const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+    const [year, month] = comp.split('-');
+    const compFormatted = `${months[parseInt(month) - 1]}_${year}`;
+
+    // name ex: "Bradesco Infinite - Colégio Alvorada CAA"
+    const parts = baseName.split(' - ');
+    const brand = (parts[0] || '').trim().replace(/\s+/g, '_');
+    const unit = (parts[1] || '').trim().replace(/\s+/g, '_');
+
+    const unitPart = unit ? `_${unit}` : '';
+    return `${typePrefix}_${brand}${unitPart}_${compFormatted}`;
+  };
+
   const exportToPDF = (items: any[], title: string, filenameSuffix: string, showBatchColumn: boolean = false) => {
     const doc = new jsPDF();
     const compText = formatCompText(competencia);
 
-    // Design Profissional - Cabeçalho
+    // Design Profissional - Cabeçalho com detalhe de marca
+    doc.setFillColor(0, 59, 113); // Navy Blue
+    doc.rect(14, 15, 2, 20, 'F'); // Pequeno detalhe vertical
+
+    doc.setFontSize(18);
+    doc.setTextColor(0, 59, 113);
+    doc.setFont('helvetica', 'bold');
+    doc.text("ANRS Contabilidade", 20, 22);
+
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.setFont('helvetica', 'normal');
+    doc.text("Assessoria e Consultoria Contábil", 20, 27);
+
     doc.setFontSize(22);
-    doc.setTextColor(0, 59, 113); // Navy Blue (#003B71)
-    doc.text("Relatório Contábil", 14, 25);
+    doc.setTextColor(40);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Relatório Contábil", 14, 45);
 
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text(`EMITIDO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 32);
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`EMITIDO EM: ${new Date().toLocaleString('pt-BR')}`, 14, 52);
 
+    // Linha divisória
     doc.setDrawColor(0, 59, 113);
     doc.setLineWidth(0.5);
-    doc.line(14, 35, 196, 35);
+    doc.line(14, 55, 196, 55);
 
     // Informações do Relatório
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.setTextColor(60);
     doc.setFont('helvetica', 'bold');
-    doc.text(title.toUpperCase(), 14, 45);
+    doc.text(title.toUpperCase(), 14, 65);
 
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Cartão Corporativo: ${cardName}`, 14, 52);
-    doc.text(`Competência: ${compText}`, 14, 58);
+    doc.setTextColor(80);
+    doc.text(`Cartão Corporativo: ${cardName}`, 14, 72);
+    doc.text(`Competência: ${compText}`, 14, 78);
 
     const tableHeaders = [["DATA", "DESCRIÇÃO / HISTÓRICO", "VALOR"]];
     if (showBatchColumn) {
@@ -307,7 +338,7 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
     });
 
     autoTable(doc, {
-      startY: 65,
+      startY: 85,
       head: tableHeaders,
       body: tableData,
       theme: 'grid',
@@ -316,7 +347,8 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
         textColor: [255, 255, 255],
         fontSize: 10,
         fontStyle: 'bold',
-        halign: 'center'
+        halign: 'center',
+        cellPadding: 4
       },
       columnStyles: {
         0: { cellWidth: 25, halign: 'center' },
@@ -326,18 +358,23 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       },
       styles: {
         fontSize: 9,
-        cellPadding: 3
+        cellPadding: 3,
+        overflow: 'linebreak'
       },
       alternateRowStyles: {
         fillColor: [245, 247, 249]
       },
-      margin: { top: 50, left: 14, right: 14 },
+      margin: { top: 60, left: 14, right: 14 },
       didDrawPage: (data) => {
         const pageCount = (doc as any).internal.getNumberOfPages();
         doc.setFontSize(8);
         doc.setTextColor(150);
+
+        // Footer text as requested by user
+        const footerText = `Gerado por ANRS Contabilidade | Página ${data.pageNumber} de ${pageCount}`;
+
         doc.text(
-          `Página ${data.pageNumber} de ${pageCount} - Gerado por Antigravity Finance`,
+          footerText,
           doc.internal.pageSize.width / 2,
           doc.internal.pageSize.height - 10,
           { align: 'center' }
@@ -345,8 +382,12 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       }
     });
 
-    const compFormatted = formatCompText(competencia);
-    doc.save(`${cardName.replace(/\s/g, '_')} - ${filenameSuffix} - ${compFormatted}.pdf`);
+    const typePrefix = filenameSuffix.includes('FATURA') ? 'Pendentes_Fatura' :
+      filenameSuffix.includes('ALOCACAO') ? 'Pendentes_Alocacao' :
+        'Fora_Competencia';
+
+    const finalFilename = getFormattedFilename(typePrefix, cardName, competencia);
+    doc.save(`${finalFilename}.pdf`);
   };
 
   const handleToggleIgnore = async (id: string) => {
@@ -433,9 +474,9 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return;
     }
 
-    const compFormatted = formatCompText(competencia);
     const suffix = motiveType === 'presta' ? 'PRESTACAO' : (motiveType === 'devolver' ? 'DEVOLVER' : 'ABATER');
-    exportToCSV(notExportedEntries, `${cardName.replace(/\s/g, '_')} - FORA_COMPETENCIA_${suffix} - ${compFormatted}`, false);
+    const finalFilename = getFormattedFilename(`FORA_COMPETENCIA_${suffix}`, cardName, competencia);
+    exportToCSV(notExportedEntries, finalFilename, false);
     setSelectedOutCompIds(new Set());
 
     // Mark as exported
@@ -502,9 +543,9 @@ const ReconciliationView: React.FC<ReconciliationViewProps> = ({ transactions, a
       return;
     }
 
-    const compFormatted = formatCompText(competencia);
     const filenameSuffix = source === 'fatura' ? 'FATURA' : (source === 'alocacao' ? 'ALOCACAO' : 'FORA_COMP');
-    exportToCSV([entry], `${cardName.replace(/\s/g, '_')} - AGRUPADO_${filenameSuffix} - ${compFormatted}`, isFromFatura);
+    const finalFilename = getFormattedFilename(`AGRUPADO_${filenameSuffix}`, cardName, competencia);
+    exportToCSV([entry], finalFilename, isFromFatura);
 
     // Clear selection after export
     if (source === 'fatura') setSelectedTxIds(new Set());
